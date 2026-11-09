@@ -1,5 +1,8 @@
 # Databricks notebook source
-# COMMAND ----------
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
 # MAGIC %md
 # MAGIC # 00_Setup: Shared Data Generator
 # MAGIC Every exercise notebook runs this notebook for you in its second cell (`%run ./00_Setup`), so you never run it by hand. It creates the `db_code` catalog, its schemas, and the base tables in `db_code.delta_lake`.
@@ -582,3 +585,6 @@ if not _SETUP_SKIP:
     print(f"  Exercise schemas: merge_operations, time_travel, schema_enforcement, optimize_file_mgmt, liquid_clustering, change_data_feed")
     print(f"  Source files: {_volume_path_elt}/json, {_volume_path_elt}/csv, {_volume_path_stream}/parquet")
     print("=" * 60)
+
+# COMMAND ----------
+

@@ -1,5 +1,8 @@
 # Databricks notebook source
-# COMMAND ----------
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
 # MAGIC %md
 # MAGIC # MERGE Operations
 # MAGIC **Topic**: Delta Lake | **Exercises**: 9 | **Total Time**: ~95 min
@@ -34,6 +37,7 @@
 # MAGIC %run ./setup/merge-operations-setup
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC **Setup complete.** Every exercise table is in `db_code.merge_operations`. Write your output tables there too, by full name (for example `db_code.merge_operations.merge_ex1_target`). In Python cells, the variables `CATALOG` and `SCHEMA` hold `db_code` and `merge_operations`. The base tables (`orders`, `customers`) are in `db_code.delta_lake`.
 # MAGIC
@@ -51,6 +55,7 @@
 # MAGIC - Exercise 9: `merge_ex9_target` (5 orders), `merge_ex9_source` (2 orders with an extra `discount_pct` column)
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 1: Basic Upsert
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -75,7 +80,13 @@
 # TODO: Write your MERGE INTO statement
 
 # Your code here
-
+spark.sql(f"""
+MERGE INTO {CATALOG}.{SCHEMA}.merge_ex1_target AS tgt
+USING {CATALOG}.{SCHEMA}.merge_ex1_source AS src
+ON tgt.order_id = src.order_id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *
+""")
 
 # COMMAND ----------
 
@@ -91,6 +102,7 @@ assert result.filter("order_id = 'ORD-001'").select("status").collect()[0][0] ==
 print("Exercise 1 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 2: Insert-Only Merge
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -115,6 +127,12 @@ print("Exercise 1 passed!")
 # TODO: Write your MERGE INTO statement
 
 # Your code here
+spark.sql(f"""
+MERGE INTO {CATALOG}.{SCHEMA}.merge_ex2_target AS tgt
+USING {CATALOG}.{SCHEMA}.merge_ex2_source AS src
+ON tgt.order_id = src.order_id
+WHEN NOT MATCHED THEN INSERT *
+""")
 
 
 # COMMAND ----------
@@ -132,6 +150,7 @@ assert ord001_status != "shipped", \
 print("Exercise 2 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 3: Update-Only Merge
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -156,6 +175,12 @@ print("Exercise 2 passed!")
 # TODO: Write your MERGE INTO statement
 
 # Your code here
+spark.sql(f"""
+MERGE INTO {CATALOG}.{SCHEMA}.merge_ex3_target AS tgt
+USING {CATALOG}.{SCHEMA}.merge_ex3_source AS src
+ON tgt.order_id = src.order_id
+WHEN MATCHED THEN UPDATE SET *
+""")
 
 
 # COMMAND ----------
@@ -173,6 +198,7 @@ assert result.filter("order_id = 'ORD-004'").select("status").collect()[0][0] !=
 print("Exercise 3 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 4: Deduplicate Before Merge
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -200,6 +226,21 @@ print("Exercise 3 passed!")
 # TODO: Dedup the source, then MERGE
 
 # Your code here
+spark.sql(f"""
+WITH deduped AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY updated_at DESC) AS rn
+    FROM {CATALOG}.{SCHEMA}.merge_ex4_source
+    QUALIFY rn = 1
+)
+
+MERGE INTO {CATALOG}.{SCHEMA}.merge_ex4_target AS tgt
+USING deduped AS src
+ON tgt.order_id = src.order_id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *
+""")
 
 
 # COMMAND ----------
@@ -215,6 +256,7 @@ assert result.filter("order_id = 'ORD-101'").count() == 1, "ORD-101 should be in
 print("Exercise 4 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 5: Conditional Merge - Only Update If Newer
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -240,6 +282,13 @@ print("Exercise 4 passed!")
 # TODO: Write your conditional MERGE
 
 # Your code here
+spark.sql(f"""
+MERGE INTO {CATALOG}.{SCHEMA}.merge_ex5_target AS tgt
+USING {CATALOG}.{SCHEMA}.merge_ex5_source AS src
+ON tgt.order_id = src.order_id
+WHEN MATCHED AND src.updated_at > tgt.updated_at THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *
+""")
 
 
 # COMMAND ----------
@@ -261,6 +310,7 @@ assert result.filter("order_id = 'ORD-101'").count() == 1, "ORD-101 should be in
 print("Exercise 5 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 6: MERGE with DELETE Clause
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -286,6 +336,14 @@ print("Exercise 5 passed!")
 # TODO: Write your MERGE with a DELETE clause
 
 # Your code here
+spark.sql(f"""
+MERGE INTO {CATALOG}.{SCHEMA}.merge_ex6_target AS tgt
+USING {CATALOG}.{SCHEMA}.merge_ex6_source AS src
+ON tgt.order_id = src.order_id
+WHEN MATCHED AND src.status = 'cancelled' THEN DELETE
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *
+""")
 
 
 # COMMAND ----------
@@ -302,6 +360,7 @@ assert result.filter("order_id = 'ORD-101'").count() == 1, "ORD-101 should be in
 print("Exercise 6 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 7: Multi-Condition MERGE
 # MAGIC **Difficulty**: Hard | **Time**: ~15 min
@@ -328,6 +387,14 @@ print("Exercise 6 passed!")
 # TODO: Write your multi-condition MERGE
 
 # Your code here
+spark.sql(f"""
+MERGE INTO {CATALOG}.{SCHEMA}.merge_ex7_target AS tgt
+USING {CATALOG}.{SCHEMA}.merge_ex7_source AS src
+ON tgt.order_id = src.order_id
+WHEN MATCHED AND src.status = 'cancelled' THEN DELETE
+WHEN MATCHED AND src.updated_at > tgt.updated_at THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *
+""")
 
 
 # COMMAND ----------
@@ -350,6 +417,7 @@ assert result.filter("order_id = 'ORD-102'").count() == 1, "ORD-102 should be in
 print("Exercise 7 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 8: SCD Type 2 with MERGE
 # MAGIC **Difficulty**: Hard | **Time**: ~20 min
@@ -397,7 +465,41 @@ print("Exercise 7 passed!")
 # TODO: Write your SCD Type 2 MERGE
 
 # Your code here
-
+spark.sql(f"""
+MERGE INTO {CATALOG}.{SCHEMA}.merge_ex8_target AS tgt
+USING {CATALOG}.{SCHEMA}.merge_ex8_source AS src
+ON tgt.customer_id = src.customer_id
+WHEN MATCHED AND (
+    COALESCE(tgt.name, '') != COALESCE(src.name, '') OR
+    COALESCE(tgt.email, '') != COALESCE(src.email, '') OR
+    COALESCE(tgt.region, '') != COALESCE(src.region, '') OR
+    COALESCE(tgt.tier, '') != COALESCE(src.tier, '')
+) THEN UPDATE SET is_current = FALSE, effective_end_date = current_date()
+WHEN NOT MATCHED THEN INSERT (
+    customer_id, name, email, region, tier, is_current, effective_start_date, effective_end_date
+) VALUES (
+    src.customer_id, src.name, src.email, src.region, src.tier, true, current_date(), '9999-12-31'
+)
+""")
+spark.sql(f"""
+WITH current_records AS (
+    SELECT
+        customer_id
+    FROM {CATALOG}.{SCHEMA}.merge_ex8_target
+    WHERE is_current
+),
+to_ingest AS (
+    SELECT
+        src.*,
+        TRUE AS is_current,
+        current_date() AS effective_start_date,
+        '9999-12-31' AS effective_end_date
+    FROM {CATALOG}.{SCHEMA}.merge_ex8_source AS src
+    LEFT ANTI JOIN current_records ON src.customer_id = current_records.customer_id
+)
+INSERT INTO {CATALOG}.{SCHEMA}.merge_ex8_target
+SELECT * FROM to_ingest
+""")
 
 # COMMAND ----------
 
@@ -426,6 +528,7 @@ print("Exercise 8 passed!")
 print("Idempotency: run your answer cell once more, then this cell. The same assertions must pass.")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 9: MERGE with Schema Evolution
 # MAGIC **Difficulty**: Hard | **Time**: ~15 min
@@ -453,6 +556,14 @@ print("Idempotency: run your answer cell once more, then this cell. The same ass
 # TODO: Write your MERGE with schema evolution
 
 # Your code here
+spark.sql(f"""
+MERGE WITH SCHEMA EVOLUTION
+INTO {CATALOG}.{SCHEMA}.merge_ex9_target AS tgt
+USING {CATALOG}.{SCHEMA}.merge_ex9_source AS src
+ON tgt.order_id = src.order_id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *
+""")
 
 
 # COMMAND ----------
@@ -471,3 +582,6 @@ assert result.filter("order_id = 'ORD-002'").select("discount_pct").collect()[0]
     "ORD-002 should have null discount_pct (not in source)"
 
 print("Exercise 9 passed!")
+
+# COMMAND ----------
+
