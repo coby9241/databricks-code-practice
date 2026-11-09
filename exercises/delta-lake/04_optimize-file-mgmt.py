@@ -1,5 +1,4 @@
 # Databricks notebook source
-# COMMAND ----------
 # MAGIC %md
 # MAGIC # OPTIMIZE & File Management
 # MAGIC **Topic**: Delta Lake | **Exercises**: 6 | **Checkpoints**: 2 | **Total Time**: ~55 min
@@ -33,6 +32,7 @@
 # MAGIC %run ./setup/optimize-file-mgmt-setup
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC **Setup complete.** Every exercise table is in `db_code.optimize_file_mgmt`. Write your output tables there too, by full name (for example `db_code.optimize_file_mgmt.opt_ex1_detail`). In Python cells, the variables `CATALOG` and `SCHEMA` hold `db_code` and `optimize_file_mgmt`. The base table (`orders`) is in `db_code.delta_lake`.
 # MAGIC
@@ -45,6 +45,7 @@
 # MAGIC - `opt_ex8_orders`: 20 rows written by 10 two-row INSERTs, then compacted by one `OPTIMIZE` in setup
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Checkpoint 1: Inspect File Count and Size
 # MAGIC **Time**: ~5 min
@@ -64,9 +65,10 @@
 
 # EXERCISE_KEY: opt_ex1
 # TODO: Run DESCRIBE DETAIL on opt_ex1_orders, then fill in what you observe
+display(spark.sql(f"DESCRIBE DETAIL db_code.optimize_file_mgmt.opt_ex1_orders"))
 
-num_files = 0      # Replace: numFiles from DESCRIBE DETAIL
-size_bytes = 0     # Replace: sizeInBytes from DESCRIBE DETAIL
+num_files = 10      # Replace: numFiles from DESCRIBE DETAIL
+size_bytes = 22977     # Replace: sizeInBytes from DESCRIBE DETAIL
 
 spark.sql(f"""
     CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.opt_ex1_detail AS
@@ -85,6 +87,7 @@ assert result.size_bytes == actual.sizeInBytes, f"size_bytes should be the sizeI
 print("Checkpoint 1 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 2: Run OPTIMIZE to Compact Files
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -104,6 +107,7 @@ print("Checkpoint 1 passed!")
 # TODO: Run OPTIMIZE on opt_ex2_orders
 
 # Your code here
+spark.sql("OPTIMIZE db_code.optimize_file_mgmt.opt_ex2_orders")
 
 
 # COMMAND ----------
@@ -119,6 +123,7 @@ assert row_count == 20, f"opt_ex2_orders has {row_count} rows: OPTIMIZE must not
 print("Exercise 2 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 3: OPTIMIZE with ZORDER
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -141,6 +146,7 @@ print("Exercise 2 passed!")
 # TODO: Run OPTIMIZE with ZORDER BY on the customer_id column
 
 # Your code here
+spark.sql("OPTIMIZE db_code.optimize_file_mgmt.opt_ex3_orders ZORDER BY (customer_id)")
 
 
 # COMMAND ----------
@@ -160,6 +166,7 @@ assert "customer_id" in zorder_ops[0].operationParameters["zOrderBy"], \
 print("Exercise 3 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 4: Measure File Metrics Before and After OPTIMIZE
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -182,11 +189,14 @@ print("Exercise 3 passed!")
 
 # EXERCISE_KEY: opt_ex4
 # TODO: Read numFiles, run OPTIMIZE, read numFiles again
+display(spark.sql("DESCRIBE DETAIL db_code.optimize_file_mgmt.opt_ex4_orders"))
 
-before_files = 0  # Replace: numFiles of opt_ex4_orders before OPTIMIZE
+before_files = 10  # Replace: numFiles of opt_ex4_orders before OPTIMIZE
 # Write your OPTIMIZE statement here
+display(spark.sql("OPTIMIZE db_code.optimize_file_mgmt.opt_ex4_orders"))
+display(spark.sql("DESCRIBE DETAIL db_code.optimize_file_mgmt.opt_ex4_orders"))
 
-after_files = 0   # Replace: numFiles of opt_ex4_orders after OPTIMIZE
+after_files = 1   # Replace: numFiles of opt_ex4_orders after OPTIMIZE
 
 spark.sql(f"""
     CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.opt_ex4_comparison AS
@@ -210,6 +220,7 @@ assert row.after_files == detail.numFiles, f"after_files should be the current n
 print("Exercise 4 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 5: Set VACUUM Retention Period
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -229,6 +240,7 @@ print("Exercise 4 passed!")
 # TODO: Set VACUUM's retention on opt_ex5_orders to 720 hours
 
 # Your code here
+spark.sql("ALTER TABLE db_code.optimize_file_mgmt.opt_ex5_orders SET TBLPROPERTIES ('delta.deletedFIleRetentionDuration' = '720 hours')")
 
 
 # COMMAND ----------
@@ -244,6 +256,7 @@ assert retention_rows[0].value == "720 hours", \
 print("Exercise 5 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 6: Run VACUUM and Verify
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -267,6 +280,10 @@ print("Exercise 5 passed!")
 # TODO: Set retention to 0 hours, run VACUUM, restore retention
 
 # Your code here
+tbl_name = "db_code.optimize_file_mgmt.opt_ex6_orders"
+spark.sql(f"ALTER TABLE {tbl_name} SET TBLPROPERTIES ('delta.deletedFIleRetentionDuration' = '0 hours')")
+spark.sql(f"VACUUM {tbl_name}")
+spark.sql(f"ALTER TABLE {tbl_name} SET TBLPROPERTIES ('delta.deletedFIleRetentionDuration' = '168 hours')")
 
 
 # COMMAND ----------
@@ -283,6 +300,7 @@ assert ret and ret[0].value in ("168 hours", "interval 168 hours"), "Set delta.d
 print("Exercise 6 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Checkpoint 7: Table Health Report from DESCRIBE DETAIL
 # MAGIC **Time**: ~5 min
@@ -302,10 +320,11 @@ print("Exercise 6 passed!")
 
 # EXERCISE_KEY: opt_ex7
 # TODO: Run DESCRIBE DETAIL on opt_ex7_orders, then fill in what you observe
+display(spark.sql("DESCRIBE DETAIL db_code.optimize_file_mgmt.opt_ex7_orders"))
 
-table_name = ""        # Replace: the 'name' value from DESCRIBE DETAIL
-num_files = 0          # Replace: numFiles
-size_bytes = 0         # Replace: sizeInBytes
+table_name = "db_code.optimize_file_mgmt.opt_ex7_orders"        # Replace: the 'name' value from DESCRIBE DETAIL
+num_files = 1          # Replace: numFiles
+size_bytes = 2402         # Replace: sizeInBytes
 
 spark.sql(f"""
     CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.opt_ex7_report AS
@@ -327,6 +346,7 @@ assert row.size_bytes == actual.sizeInBytes, f"size_bytes should be the sizeInBy
 print("Checkpoint 7 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 8: Analyze OPTIMIZE History
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -347,10 +367,11 @@ print("Checkpoint 7 passed!")
 
 # EXERCISE_KEY: opt_ex8
 # TODO: Run DESCRIBE HISTORY, find the OPTIMIZE row, read operationMetrics, fill in values
+display(spark.sql("DESCRIBE HISTORY db_code.optimize_file_mgmt.opt_ex8_orders"))
 
-version = 0            # Replace: version number of the OPTIMIZE operation
-files_added = "0"      # Replace: operationMetrics['numAddedFiles']
-files_removed = "0"    # Replace: operationMetrics['numRemovedFiles']
+version = 11            # Replace: version number of the OPTIMIZE operation
+files_added = "1"      # Replace: operationMetrics['numAddedFiles']
+files_removed = "10"    # Replace: operationMetrics['numRemovedFiles']
 
 spark.sql(f"""
     CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.opt_ex8_analysis AS
@@ -372,3 +393,6 @@ opt_versions = [r.version for r in spark.sql(f"DESCRIBE HISTORY {CATALOG}.{SCHEM
 assert row.version in opt_versions, f"version should be the version of the OPTIMIZE row in DESCRIBE HISTORY, got {row.version}"
 
 print("Exercise 8 passed!")
+
+# COMMAND ----------
+

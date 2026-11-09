@@ -1,5 +1,4 @@
 # Databricks notebook source
-# COMMAND ----------
 # MAGIC %md
 # MAGIC # Time Travel & Restore
 # MAGIC **Topic**: Delta Lake | **Exercises**: 7 | **Checkpoints**: 1 | **Total Time**: ~90 min
@@ -33,6 +32,7 @@
 # MAGIC %run ./setup/time-travel-setup
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC **Setup complete.** Every exercise table is in `db_code.time_travel`. Write your output tables there too, by full name (for example `db_code.time_travel.tt_ex1_result`). In Python cells, the variables `CATALOG` and `SCHEMA` hold `db_code` and `time_travel`. The base table (`orders`) is in `db_code.delta_lake`.
 # MAGIC
@@ -51,6 +51,7 @@
 # MAGIC **Note**: Auto compaction can add an `OPTIMIZE` version after an UPDATE or DELETE, so version numbers can shift. Version 0 is always the CREATE; never hardcode any other version number. Where you need a later version, the setup stores it in a variable: `TT_EX8_INSERT_V` in Exercise 8.
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 1: Query by Version Number
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -74,6 +75,11 @@
 # TODO: Query the table at version 0 and save to tt_ex1_result
 
 # Your code here
+spark.sql(f"""
+CREATE TABLE {CATALOG}.{SCHEMA}.tt_ex1_result AS
+SELECT * 
+FROM {CATALOG}.{SCHEMA}.tt_ex1_orders FOR VERSION AS OF 0
+""")
 
 
 # COMMAND ----------
@@ -88,6 +94,7 @@ assert result.filter("order_id = 'ORD-005'").count() == 1, \
 print("Exercise 1 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 2: Query by Timestamp
 # MAGIC **Difficulty**: Easy | **Time**: ~10 min
@@ -114,6 +121,14 @@ print("Exercise 1 passed!")
 # TODO: Look up the UPDATE operation's timestamp via DESCRIBE HISTORY, then query with TIMESTAMP AS OF and save to tt_ex2_result
 
 # Your code here
+display(spark.sql(f"""DESCRIBE HISTORY {CATALOG}.{SCHEMA}.tt_ex2_orders"""))
+
+spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.tt_ex2_result AS
+SELECT *
+FROM {CATALOG}.{SCHEMA}.tt_ex2_orders
+FOR TIMESTAMP AS OF '2026-11-09T12:13:03.000+00:00'
+""")
 
 
 # COMMAND ----------
@@ -130,6 +145,7 @@ assert result.filter("order_id = 'ORD-003'").select("amount").collect()[0][0] ==
 print("Exercise 2 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Checkpoint 3: DESCRIBE HISTORY
 # MAGIC **Time**: ~5 min
@@ -154,10 +170,11 @@ print("Exercise 2 passed!")
 
 # EXERCISE_KEY: tt_ex3
 # TODO: Run DESCRIBE HISTORY on tt_ex3_orders, then fill in what you observe
+display(spark.sql(f"""DESCRIBE HISTORY {CATALOG}.{SCHEMA}.tt_ex3_orders"""))
 
-total_versions = 0        # Replace: how many versions (rows) does the history show?
-latest_operation = ""     # Replace: the `operation` value of the highest version in DESCRIBE HISTORY
-num_dml_operations = 0    # Replace: how many history rows have an operation other than OPTIMIZE? (the CREATE TABLE AS SELECT row counts)
+total_versions = 5        # Replace: how many versions (rows) does the history show?
+latest_operation = "WRITE"     # Replace: the `operation` value of the highest version in DESCRIBE HISTORY
+num_dml_operations = 4    # Replace: how many history rows have an operation other than OPTIMIZE? (the CREATE TABLE AS SELECT row counts)
 
 spark.sql(f"""
     CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.tt_ex3_history AS
@@ -181,6 +198,7 @@ assert row.num_dml_operations == TT_EX3_DML_COUNT, \
 print("Checkpoint 3 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 4: RESTORE to Previous Version
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -204,6 +222,7 @@ print("Checkpoint 3 passed!")
 # TODO: Restore the table to version 0
 
 # Your code here
+spark.sql(f"""RESTORE TABLE {CATALOG}.{SCHEMA}.tt_ex4_orders TO VERSION AS OF 0""")
 
 
 # COMMAND ----------
@@ -222,6 +241,7 @@ assert _ops[0] == "RESTORE", f"The latest change to tt_ex4_orders is {_ops[0]}, 
 print("Exercise 4 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 5: Diff Two Versions
 # MAGIC **Difficulty**: Medium | **Time**: ~15 min
@@ -254,7 +274,20 @@ print("Exercise 4 passed!")
 # TODO: Find order_ids that changed between version 0 and current
 
 # Your code here
-
+display(spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.tt_ex5_changes AS
+SELECT DISTINCT COALESCE(curr.order_id, prev.order_id) AS order_id
+FROM {CATALOG}.{SCHEMA}.tt_ex5_orders AS curr
+FULL OUTER JOIN {CATALOG}.{SCHEMA}.tt_ex5_orders FOR VERSION AS OF 0 AS prev
+ON curr.order_id = prev.order_id
+WHERE (curr.amount != prev.amount
+    OR curr.customer_id != prev.customer_id
+    OR curr.product_id != prev.product_id
+    OR curr.status != prev.status
+    OR curr.order_date != prev.order_date
+    OR curr.updated_at != prev.updated_at) OR curr.order_id IS NULL
+    OR prev.order_id IS NULL"""))
+display(spark.sql(f"""SELECT * FROM {CATALOG}.{SCHEMA}.tt_ex5_orders"""))
 
 # COMMAND ----------
 
@@ -270,6 +303,7 @@ assert "ORD-101" in changed_ids, "ORD-101 was added and should be in changes"
 print("Exercise 5 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 6: Audit Trail
 # MAGIC **Difficulty**: Medium | **Time**: ~15 min
@@ -297,9 +331,12 @@ print("Exercise 5 passed!")
 
 # EXERCISE_KEY: tt_ex6
 # TODO: Find the version that introduced the order with amount > 1000, then fill in the values below
+display(spark.sql(f"DESCRIBE HISTORY {CATALOG}.{SCHEMA}.tt_ex6_orders"))
+display(spark.sql(f"SELECT * FROM {CATALOG}.{SCHEMA}.tt_ex6_orders FOR VERSION AS OF 1"))
+display(spark.sql(f"SELECT * FROM {CATALOG}.{SCHEMA}.tt_ex6_orders FOR VERSION AS OF 4"))
 
-bad_version = 0        # Replace: the version number that introduced the fraudulent order
-bad_order_id = ""      # Replace: the order_id of the fraudulent order
+bad_version = 3        # Replace: the version number that introduced the fraudulent order
+bad_order_id = "ORD-999"      # Replace: the order_id of the fraudulent order
 
 spark.sql(f"""
     CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.tt_ex6_audit AS
@@ -322,6 +359,7 @@ assert row.bad_version == TT_EX6_BAD_VERSION, \
 print("Exercise 6 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 7: Selective Undo via MERGE + Time Travel
 # MAGIC **Difficulty**: Hard | **Time**: ~20 min
@@ -351,6 +389,17 @@ print("Exercise 6 passed!")
 # TODO: Use MERGE with time travel to selectively undo the bad update
 
 # Your code here
+spark.sql(f"""
+WITH src AS (
+    SELECT * FROM {CATALOG}.{SCHEMA}.tt_ex7_orders
+    FOR VERSION AS OF 0
+    WHERE order_id IN ('ORD-003','ORD-005')
+)
+MERGE INTO {CATALOG}.{SCHEMA}.tt_ex7_orders AS tgt
+USING src
+ON tgt.order_id = src.order_id
+WHEN MATCHED THEN UPDATE SET *
+""")
 
 
 # COMMAND ----------
@@ -374,6 +423,7 @@ assert result.filter("order_id = 'ORD-001'").collect()[0].status == "shipped", \
 print("Exercise 7 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 8: Reproducible Reporting with Time Travel
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -406,6 +456,10 @@ print("Exercise 7 passed!")
 # TODO: Create the revenue report from the INSERT version (TT_EX8_INSERT_V)
 
 # Your code here
+display(spark.sql(f"""
+CREATE TABLE {CATALOG}.{SCHEMA}.tt_ex8_report
+SELECT COUNT(*)::LONG AS order_count, SUM(amount)::DOUBLE AS total_amount FROM {CATALOG}.{SCHEMA}.tt_ex8_orders FOR VERSION AS OF {TT_EX8_INSERT_V}
+"""))
 
 
 # COMMAND ----------
@@ -430,3 +484,6 @@ assert row.total_amount < current_total, \
     "Report total should be less than current total (which has corrupted 100x amounts)"
 
 print("Exercise 8 passed!")
+
+# COMMAND ----------
+

@@ -1,5 +1,8 @@
 # Databricks notebook source
-# COMMAND ----------
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
 # MAGIC %md
 # MAGIC # Spark SQL Joins & Aggregations
 # MAGIC **Topic**: ELT | **Exercises**: 9 | **Total Time**: ~95 min
@@ -64,6 +67,7 @@
 # MAGIC %run ./setup/spark-sql-joins-setup
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC Your output tables go in `db_code.spark_sql_joins`; the base tables are in `db_code.elt`.
 # MAGIC
@@ -80,6 +84,7 @@
 # MAGIC - Ex 9 (hard): CUBE for all-combination subtotals
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 1: Inner Join Orders with Customers
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -105,6 +110,20 @@
 # TODO: Inner join orders with customers and write to Delta table
 
 # Your code here
+spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.joins_ex1_output AS 
+SELECT 
+    o.order_id,
+    o.customer_id,
+    o.amount,
+    o.status,
+    o.order_date,
+    c.name,
+    c.region,
+    c.tier
+FROM {CATALOG}.elt.orders AS o
+    JOIN {CATALOG}.elt.customers AS c ON o.customer_id = c.customer_id
+""")
 
 
 # COMMAND ----------
@@ -126,6 +145,7 @@ assert result.filter("customer_id IS NULL").count() == 0, \
 print("Exercise 1 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 2: Left Join with COALESCE for Null Handling
 # MAGIC **Difficulty**: Easy | **Time**: ~5 min
@@ -151,7 +171,20 @@ print("Exercise 1 passed!")
 # TODO: Left join orders with customers, COALESCE nulls, write to Delta
 
 # Your code here
-
+spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.joins_ex2_output AS 
+SELECT 
+    o.order_id,
+    o.customer_id,
+    o.amount,
+    o.status,
+    o.order_date,
+    COALESCE(c.name, 'Unknown') AS name,
+    c.region,
+    c.tier
+FROM {CATALOG}.elt.orders AS o
+    LEFT JOIN {CATALOG}.elt.customers AS c ON o.customer_id = c.customer_id
+""")
 
 # COMMAND ----------
 
@@ -172,6 +205,7 @@ assert unknown_count > 0, "Expected some 'Unknown' names for orders with NULL cu
 print("Exercise 2 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 3: Anti-Join to Find Orphan Order Items
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -198,6 +232,13 @@ print("Exercise 2 passed!")
 # TODO: Anti-join to find orphan line items, write to Delta
 
 # Your code here
+spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.joins_ex3_output AS 
+SELECT 
+    oi.*
+FROM {CATALOG}.elt.order_items AS oi
+    LEFT ANTI JOIN {CATALOG}.elt.orders AS o ON oi.order_id = o.order_id
+""")
 
 
 # COMMAND ----------
@@ -223,6 +264,7 @@ assert "unit_price" in result.columns, "Missing 'unit_price' column from order_i
 print("Exercise 3 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 4: Semi-Join to Find Customers with a Cancelled Order
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -250,6 +292,12 @@ print("Exercise 3 passed!")
 # TODO: Semi-join customers against their cancelled orders, write to Delta
 
 # Your code here
+spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.joins_ex4_output AS 
+SELECT c.*
+FROM {CATALOG}.elt.customers AS c
+    LEFT SEMI JOIN (SELECT * FROM {CATALOG}.elt.orders WHERE status = 'cancelled') AS o ON o.customer_id = c.customer_id
+""")
 
 
 # COMMAND ----------
@@ -275,6 +323,7 @@ assert result.count() == result.select("customer_id").distinct().count(), \
 print("Exercise 4 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 5: Self-Join to Find Same-Day Orders by Same Customer
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -305,7 +354,19 @@ print("Exercise 4 passed!")
 # TODO: Self-join orders to find same-day pairs, write to Delta
 
 # Your code here
-
+spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.joins_ex5_output AS
+SELECT
+    o1.customer_id,
+    o1.order_date,
+    o1.order_id AS order_id_1,
+    o2.order_id AS order_id_2,
+    o1.amount AS amount_1,
+    o2.amount AS amount_2
+FROM db_code.elt.orders AS o1
+    INNER JOIN db_code.elt.orders AS o2 ON o1.customer_id = o2.customer_id AND o1.order_date = o2.order_date AND o1.order_id < o2.order_id
+WHERE o1.customer_id IS NOT NULL
+""")
 
 # COMMAND ----------
 
@@ -333,6 +394,7 @@ assert bad_pairs == 0, f"Found {bad_pairs} rows where order_id_1 >= order_id_2 -
 print("Exercise 5 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 6: Multi-Table Join Chain (Orders + Customers + Products + Order Items)
 # MAGIC **Difficulty**: Medium | **Time**: ~15 min
@@ -365,6 +427,23 @@ print("Exercise 5 passed!")
 # TODO: Multi-table join with QUALIFY, write to Delta
 
 # Your code here
+spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.joins_ex6_output AS
+SELECT 
+    o.order_id,
+    c.name AS customer_name,
+    c.region,
+    oi.quantity,
+    oi.unit_price,
+    p.name AS product_name,
+    p.category,
+    o.status
+FROM db_code.elt.orders AS o
+    INNER JOIN db_code.elt.customers AS c ON o.customer_id = c.customer_id
+    INNER JOIN db_code.elt.order_items AS oi ON o.order_id = oi.order_id
+    INNER JOIN db_code.elt.products AS p ON oi.product_id = p.product_id
+QUALIFY ROW_NUMBER() OVER (PARTITION BY o.order_id ORDER BY oi.quantity DESC, o.updated_at DESC) = 1
+""")
 
 
 # COMMAND ----------
@@ -391,6 +470,7 @@ assert row.quantity == 4, f"ORD-001 should keep its highest-quantity line item, 
 print("Exercise 6 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 7: GROUP BY with HAVING to Find High-Value Customers
 # MAGIC **Difficulty**: Medium | **Time**: ~10 min
@@ -420,6 +500,21 @@ print("Exercise 6 passed!")
 # TODO: GROUP BY with HAVING for high-value customers, write to Delta
 
 # Your code here
+spark.sql(f"""
+CREATE OR REPLACE TABLE {CATALOG}.{SCHEMA}.joins_ex7_output AS 
+SELECT 
+    o.customer_id,
+    c.name,
+    c.region,
+    COUNT(*) AS order_count,
+    SUM(amount) AS total_spent,
+    AVG(amount) AS avg_order_value
+FROM db_code.elt.orders AS o
+    INNER JOIN db_code.elt.customers AS c ON o.customer_id = c.customer_id
+WHERE o.customer_id IS NOT NULL
+GROUP BY ALL
+HAVING total_spent > 500
+""")
 
 
 # COMMAND ----------
@@ -450,6 +545,7 @@ assert result.count() == result.select("customer_id").distinct().count(), \
 print("Exercise 7 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 8: ROLLUP for Hierarchical Subtotals by Region and Tier
 # MAGIC **Difficulty**: Hard | **Time**: ~15 min
@@ -484,6 +580,19 @@ print("Exercise 7 passed!")
 # TODO: Build ROLLUP aggregation table, write to Delta
 
 # Your code here
+spark.sql(f"""
+CREATE OR REPLACE TABLE db_code.spark_sql_joins.joins_ex8_rollup AS
+SELECT 
+    region,
+    tier,
+    COUNT(*) AS order_count,
+    SUM(amount) AS total_revenue,
+    AVG(amount) AS avg_order_value
+FROM db_code.elt.orders AS o
+    INNER JOIN db_code.elt.customers AS c ON o.customer_id = c.customer_id
+WHERE o.status = 'completed'
+GROUP BY ROLLUP(region, tier)
+""")
 
 
 # COMMAND ----------
@@ -517,6 +626,7 @@ assert grand_count == JOINS_EX8_EXPECTED_GRAND_COUNT, \
 print("Exercise 8 passed!")
 
 # COMMAND ----------
+
 # MAGIC %md
 # MAGIC ## Exercise 9: CUBE for All-Combination Subtotals Across Region and Status
 # MAGIC **Difficulty**: Hard | **Time**: ~15 min
@@ -549,7 +659,18 @@ print("Exercise 8 passed!")
 # TODO: Build CUBE aggregation table, write to Delta
 
 # Your code here
-
+spark.sql(f"""
+CREATE OR REPLACE TABLE db_code.spark_sql_joins.joins_ex9_cube AS
+SELECT 
+    region,
+    status,
+    COUNT(*) AS order_count,
+    SUM(amount) AS total_revenue,
+    AVG(amount) AS avg_order_value
+FROM db_code.elt.orders AS o
+    INNER JOIN db_code.elt.customers AS c ON o.customer_id = c.customer_id
+GROUP BY CUBE(region, status)
+""")
 
 # COMMAND ----------
 
@@ -583,3 +704,6 @@ assert grand_count == JOINS_EX1_EXPECTED_COUNT, \
     f"Grand total order_count should be {JOINS_EX1_EXPECTED_COUNT} (all statuses), got {grand_count}"
 
 print("Exercise 9 passed!")
+
+# COMMAND ----------
+
