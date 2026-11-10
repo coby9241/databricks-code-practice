@@ -61,6 +61,17 @@ Tip: if stuck, see the solution below.
 """
 ### ---------------------
 ### Write Your Code Here ###
+dp.create_streaming_table(SILVER_CUSTOMERS)
+dp.create_auto_cdc_flow(
+    target=SILVER_CUSTOMERS,
+    source=CUSTOMERS_CLEANED_STREAM,
+    keys=["customer_id"],
+    sequence_by="last_update_time",
+    track_history_column_list=['name', 'email', 'address', 'phone_number', 'gender'],
+    except_column_list=["last_update_time", "ingest_timestamp", "source_file_path"],
+    ignore_null_updates=True,
+    stored_as_scd_type=2,
+)
 
 
 ### ---------------------
@@ -116,6 +127,17 @@ Tip: if stuck, see the solution below.
 """
 ### ---------------------
 ### Write Your Code Here ###
+dp.create_streaming_table(SILVER_PRODUCTS)
+dp.create_auto_cdc_flow(
+    target=SILVER_PRODUCTS,
+    source=PRODUCTS_CLEANED_STREAM,
+    keys=["product_id"],
+    sequence_by=F.col("last_update_time"),
+    track_history_column_list=['name', 'category', 'brand', 'price', 'description', 'color', 'size'],
+    except_column_list=["last_update_time", "ingest_timestamp", "source_file_path"],
+    ignore_null_updates=True,
+    stored_as_scd_type=2,
+)
 
 
 ### ---------------------
@@ -172,6 +194,17 @@ Tip: if stuck, see the solution below.
 """
 ### ---------------------
 ### Write Your Code Here ###
+dp.create_streaming_table(SILVER_STORES)
+dp.create_auto_cdc_flow(
+    target=SILVER_STORES,
+    source=STORES_CLEANED_STREAM,
+    keys=["store_id"],
+    sequence_by="last_update_time",
+    track_history_column_list=['name', 'address', 'manager', 'status'],
+    except_column_list=["last_update_time", "ingest_timestamp", "source_file_path"],
+    ignore_null_updates=True,
+    stored_as_scd_type=2,
+)
 
 
 ### ---------------------

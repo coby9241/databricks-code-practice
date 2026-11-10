@@ -61,7 +61,53 @@ Tip: if stuck, see the solution below.
 """
 ### ---------------------
 ### Write Your Code Here ###
-
+@dp.table(name=GOLD_DENORMALIZED_SALES_FACTS, comment="Sales joined to the current customer, product and store")
+def denormalized_sales_facts():
+    sales = (
+        spark
+        .readStream
+        .table(SILVER_SALES_TRANSACTIONS)
+    )
+    customers = spark.read.table(SILVER_CUSTOMERS_CURRENT)
+    products = spark.read.table(SILVER_PRODUCTS_CURRENT)
+    stores = spark.read.table(SILVER_STORES_CURRENT)
+    return (
+        sales
+        .alias("sales")
+        .join(
+            stores.alias("stores"),
+            F.col("sales.store_id") == F.col("stores.store_id"),
+            how="left",
+        )
+        .join(
+            customers.alias("customers"),
+            F.col("customers.customer_id") == F.col("sales.customer_id"),
+            how="left",
+        )
+        .join(
+            products.alias("products"),
+            F.col("sales.product_id") == F.col("products.product_id"),
+            how="left",
+        )
+        .selectExpr(
+            "sales.transaction_id",
+            "sales.event_time",
+            "sales.date AS sale_date",
+            "sales.customer_id",
+            "customers.name AS customer_name",
+            "sales.product_id",
+            "products.name AS product_name",
+            "products.category AS product_category",
+            "sales.store_id",
+            "stores.name AS store_name",
+            "sales.quantity",
+            "sales.unit_price",
+            "sales.total_amount",
+            "sales.payment_method",
+            "sales.discount_applied",
+            "sales.tax_amount",
+        )
+    )
 
 ### ---------------------
 ### Solution Is Below 
@@ -154,7 +200,41 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
+@dp.materialized_view(name=GOLD_DAILY_SALES_BY_STORE, comment="Daily store sales summary")
+def gold_daily_sales_by_store():
+    stores = (
+        spark
+        .read
+        .table(SILVER_STORES_CURRENT)
+    )
 
+    return (
+        spark
+        .read
+        .table(GOLD_DENORMALIZED_SALES_FACTS)
+        .groupBy("sale_date", "store_id")
+        .agg(
+            F.round(F.sum("total_amount"), 2).alias("total_revenue"),
+            F.count("transaction_id").alias("total_transactions"),
+            F.sum("quantity").alias("total_items_sold"),
+            F.countDistinct("customer_id").alias("unique_customers"),
+        )
+        .alias("sales")
+        .join(
+            stores.alias("stores"),
+            F.col("stores.store_id") == F.col("sales.store_id"),
+            how="left",
+        )
+        .selectExpr(
+            "sale_date",
+            "sales.store_id",
+            "stores.name AS store_name",
+            "total_revenue",
+            "total_transactions",
+            "total_items_sold",
+            "unique_customers",
+        )
+    )
 
 ### ---------------------
 ### Solution Is Below 
@@ -231,7 +311,39 @@ Tips:
 
 ### ---------------------
 ### Write Your Code Here ###
+@dp.materialized_view(name=GOLD_PRODUCT_PERFORMANCE, comment="Product sales performance metrics")
+def gold_product_performance():
+    products = (
+        spark
+        .read
+        .table(SILVER_PRODUCTS_CURRENT)
+    )
 
+    return (
+        spark
+        .read
+        .table(GOLD_DENORMALIZED_SALES_FACTS)
+        .groupBy("product_id")
+        .agg(
+            F.round(F.sum("total_amount"), 2).alias("total_revenue"),
+            F.sum("quantity").alias("total_quantity_sold"),
+            F.count("transaction_id").alias("total_orders"),
+        )
+        .alias("sales")
+        .join(
+            products.alias("products"),
+            F.col("products.product_id") == F.col("sales.product_id"),
+            how="left",
+        )
+        .selectExpr(
+            "sales.product_id",
+            "products.name AS product_name",
+            "products.category AS product_category",
+            "total_revenue",
+            "total_quantity_sold",
+            "total_orders",
+        )
+    )
 
 ### ---------------------
 ### Solution Is Below 
@@ -308,7 +420,42 @@ Tips:
 
 ### ---------------------
 ### Write Your Code Here ###
+@dp.materialized_view(name=GOLD_CUSTOMER_LIFETIME_VALUE, comment="Customer lifetime value metrics")
+def gold_customer_lifetime_value():
+    customers = (
+        spark
+        .read
+        .table(SILVER_CUSTOMERS_CURRENT)
+    )
 
+    return (
+        spark
+        .read
+        .table(GOLD_DENORMALIZED_SALES_FACTS)
+        .groupBy("customer_id")
+        .agg(
+            F.round(F.sum("total_amount"), 2).alias("total_spend"),
+            F.countDistinct("transaction_id").alias("total_orders"),
+            F.expr("CAST(MIN(event_time) AS DATE) AS first_purchase_date"),
+            F.expr("CAST(MAX(event_time) AS DATE) AS last_purchase_date"),
+            F.round(F.avg("total_amount"), 2).alias("avg_order_value"),
+        )
+        .alias("sales")
+        .join(
+            customers.alias("customers"),
+            F.col("customers.customer_id") == F.col("sales.customer_id"),
+            how="left",
+        )
+        .selectExpr(
+            "sales.customer_id",
+            "customers.name AS customer_name",
+            "total_spend",
+            "total_orders",
+            "first_purchase_date",
+            "last_purchase_date",
+            "avg_order_value",
+        )
+    )
 
 ### ---------------------
 ### Solution Is Below 

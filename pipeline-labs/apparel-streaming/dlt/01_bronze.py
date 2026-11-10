@@ -76,6 +76,31 @@ Tip: if stuck, see the solution below.
 """
 ### ---------------------
 ### Write Your Code Here ###
+@dp.table(name=BRONZE_SALES, comment="Raw sales data")
+@dp.expect_or_fail("valid_transaction_id", "transaction_id IS NOT NULL")
+def ingest_sales():
+    return (
+        spark
+        .readStream
+        .format("delta")
+        .load(RAW_SALES_PATH)
+        .selectExpr(
+            "CAST(transaction_id AS INT) AS transaction_id",
+            "CAST(store_id AS INT) AS store_id",
+            "CAST(customer_id AS INT) AS customer_id",
+            "CAST(product_id AS INT) AS product_id",
+            "CAST(quantity AS INT) AS quantity",
+            "CAST(event_time AS TIMESTAMP) AS event_time",
+            "CAST(unit_price AS DOUBLE) AS unit_price",
+            "CAST(total_amount AS DOUBLE) AS total_amount",
+            "CAST(discount_applied AS DOUBLE) AS discount_applied",
+            "CAST(tax_amount AS DOUBLE) AS tax_amount",
+            "CAST(payment_method AS STRING) AS payment_method",
+            "CURRENT_TIMESTAMP() AS ingest_timestamp",
+            "_metadata.file_path AS source_file_path"
+        )
+    )
+    
 
 
 ### ---------------------
@@ -135,6 +160,30 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
+@dp.table(name=BRONZE_CUSTOMERS, comment="Raw customers data from landing zone")
+@dp.expect_or_fail("valid_customer_id", "customer_id IS NOT NULL")
+def ingest_customers():
+    return (
+        spark
+        .readStream
+        .format("delta")
+        .load(RAW_CUSTOMERS_PATH)
+        .selectExpr(
+            "CAST(customer_id AS INT) AS customer_id",
+            "CAST(loyalty_points AS INT) AS loyalty_points",
+            "CAST(age AS INT) AS age",
+            "CAST(join_date AS TIMESTAMP) AS join_date",
+            "CAST(last_update_time AS TIMESTAMP) AS last_update_time",
+            "CAST(name AS STRING) AS name",
+            "CAST(email AS STRING) AS email",
+            "CAST(address AS STRING) AS address",
+            "CAST(phone_number AS STRING) AS phone_number",
+            "CAST(gender AS STRING) AS gender",
+            "CURRENT_TIMESTAMP() AS ingest_timestamp",
+            "_metadata.file_path AS source_file_path"
+        )
+    )
+
 
 
 ### ---------------------
@@ -193,6 +242,29 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
+@dp.table(name=BRONZE_PRODUCTS, comment="Raw products data")
+@dp.expect_or_fail("valid_product_id", "product_id IS NOT NULL")
+def ingest_products():
+    return (
+        spark
+        .readStream
+        .format("delta")
+        .load(RAW_PRODUCTS_PATH)
+        .selectExpr(
+            "CAST(product_id AS INT) AS product_id",
+            "CAST(stock_quantity AS INT) AS stock_quantity",
+            "CAST(price AS DOUBLE) AS price",
+            "CAST(last_update_time AS TIMESTAMP) AS last_update_time",
+            "CAST(name AS STRING) AS name",
+            "CAST(category AS STRING) AS category",
+            "CAST(brand AS STRING) AS brand",
+            "CAST(size AS STRING) AS size",
+            "CAST(color AS STRING) AS color",
+            "CAST(description AS STRING) AS description",
+            "CURRENT_TIMESTAMP() AS ingest_timestamp",
+            "_metadata.file_path AS source_file_path"
+        )
+    )
 
 
 ### ---------------------
@@ -251,6 +323,27 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
+@dp.table(name=BRONZE_STORES, comment="Raw stores data")
+@dp.expect_or_fail("valid_store_id", "store_id IS NOT NULL")
+def ingest_stores():
+    return (
+        spark
+        .readStream
+        .format("delta")
+        .load(RAW_STORES_PATH)
+        .selectExpr(
+            "CAST(store_id AS INT) AS store_id",
+            "CAST(open_date AS TIMESTAMP) AS open_date",
+            "CAST(last_update_time AS TIMESTAMP) AS last_update_time",
+            "CAST(name AS STRING) AS name",
+            "CAST(address AS STRING) AS address",
+            "CAST(manager AS STRING) AS manager",
+            "CAST(status AS STRING) AS status",
+            "CAST(phone_number AS STRING) AS phone_number",
+            "CURRENT_TIMESTAMP() AS ingest_timestamp",
+            "_metadata.file_path AS source_file_path"
+        )
+    )
 
 
 ### ---------------------

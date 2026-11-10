@@ -48,6 +48,18 @@ Tip: if stuck, see the solution below.
 """
 ### ---------------------
 ### Write Your Code Here ###
+@dp.table(name=SILVER_SALES_TRANSACTIONS, comment="Stream sales table (positive quantity)")
+@dp.expect_or_drop("valid_discount", "discount_applied >= 0")
+@dp.expect_or_drop("valid_store_id", "store_id IS NOT NULL")
+@dp.expect_or_drop("valid_customer_id", "customer_id IS NOT NULL")
+@dp.expect_or_drop("valid_product_id", "product_id IS NOT NULL")
+def silver_sales_transactions():
+  return (
+    spark
+    .readStream
+    .table(SALES_CLEANED_STREAM)
+    .filter(F.col("quantity") > 0)
+  )
 
 
 ### ---------------------
@@ -107,7 +119,23 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
-
+@dp.table(name=SILVER_RETURNS_TRANSACTIONS, comment="Stream returns table (negative quantity)")
+@dp.expect_or_drop("valid_discount", "discount_applied >= 0")
+@dp.expect_or_drop("valid_store_id", "store_id IS NOT NULL")
+@dp.expect_or_drop("valid_customer_id", "customer_id IS NOT NULL")
+@dp.expect_or_drop("valid_product_id", "product_id IS NOT NULL")
+def silver_sales_transactions():
+  return (
+    spark
+    .readStream
+    .table(SALES_CLEANED_STREAM)
+    .filter(F.col("quantity") < 0)
+    .withColumns({
+      "returned_quantity": F.abs("quantity"),
+      "returned_amount": F.abs("total_amount")
+    })
+    .drop("quantity", "total_amount")
+  )
 
 ### ---------------------
 ### Solution Is Below 

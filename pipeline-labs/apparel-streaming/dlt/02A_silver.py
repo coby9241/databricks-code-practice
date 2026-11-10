@@ -73,6 +73,21 @@ Tip: if stuck, see the solution below.
 """
 ### ---------------------
 ### Write Your Code Here ###
+@dp.temporary_view(name=CUSTOMERS_CLEANED_STREAM, comment="QC for customers stream")
+@dp.expect_or_drop("valid_customer_id", "customer_id IS NOT NULL")
+@dp.expect_all({
+  "valid_email": "email IS NOT NULL AND email LIKE '%@%.%'",
+  "realistic_age": "age BETWEEN 18 AND 100",
+  "realistic_loyalty_points": "loyalty_points < 0",
+  "valid_gender": "gender IN ('Male', 'Female', 'Other')"
+})
+def customers_cleaned_stream():
+  return (
+    spark
+    .readStream
+    .table(BRONZE_CUSTOMERS)
+  )
+
 
 
 ### ---------------------
@@ -139,6 +154,18 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
+@dp.temporary_view(name=PRODUCTS_CLEANED_STREAM, comment="QC for products stream")
+@dp.expect_or_drop("valid_product_id", "product_id IS NOT NULL")
+@dp.expect_or_drop("valid_product_price", "price > 0 AND price < 1000")
+@dp.expect("non_negative_stock", "stock_quantity >= 0")
+@dp.expect("valid_category", "category IN ('Casual Wear', 'Formal Wear', 'Sportswear', 'Accessories', 'Footwear')")
+@dp.expect("valid_brand", "brand IS NOT NULL")
+def products_cleaned_stream():
+  return (
+    spark
+    .readStream
+    .table(BRONZE_PRODUCTS)
+  )
 
 
 ### ---------------------
@@ -198,7 +225,18 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
-
+@dp.temporary_view(name=STORES_CLEANED_STREAM, comment="QC for stores stream")
+@dp.expect_or_drop("valid_store_id", "store_id IS NOT NULL")
+@dp.expect("manager_assigned", "manager != 'Unknown'")
+@dp.expect("valid_status", "status IN ('Open', 'Under Renovation')")
+def stores_cleaned_stream():
+  return (
+    spark
+    .readStream
+    .table(BRONZE_STORES)
+    .withColumn("manager", F.coalesce(F.col("manager"), F.lit("Unknown")))
+  )
+  
 
 ### ---------------------
 ### Solution Is Below 
@@ -260,7 +298,19 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
-
+@dp.temporary_view(name=SALES_CLEANED_STREAM, comment="QC for sales stream (fact)")
+@dp.expect_all({
+  "valid_payment_method": "payment_method IN ('Cash', 'Credit Card', 'Debit Card', 'Mobile Pay', 'Gift Card')",
+  "realistic_discount": "discount_applied >= 0"
+})
+def sales_cleaned_stream():
+  return (
+    spark
+    .readStream
+    .table(BRONZE_SALES)
+    .withWatermark("event_time", "10 minutes")
+    .withColumn("date", F.expr("CAST(event_time AS DATE)"))
+  )
 
 ### ---------------------
 ### Solution Is Below 

@@ -37,7 +37,14 @@ Tip: if stuck, see the solution below.
 """
 ### ---------------------
 ### Write Your Code Here ###
-
+@dp.temporary_view(name=SILVER_CUSTOMERS_CURRENT, comment="Current customers (SCD2)")
+def silver_customers_current():
+    return (
+        spark
+        .read
+        .table(SILVER_CUSTOMERS)
+        .filter("__END_AT IS NULL")
+    )
 
 ### ---------------------
 ### Solution Is Below 
@@ -76,7 +83,14 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
-
+@dp.temporary_view(name=SILVER_PRODUCTS_CURRENT, comment="Current products (SCD2)")
+def silver_customers_current():
+    return (
+        spark
+        .read
+        .table(SILVER_PRODUCTS)
+        .filter("__END_AT IS NULL")
+    )
 
 ### ---------------------
 ### Solution Is Below 
@@ -115,7 +129,14 @@ Tips:
 """
 ### ---------------------
 ### Write Your Code Here ###
-
+@dp.temporary_view(name=SILVER_STORES_CURRENT, comment="Current stores (SCD2)")
+def silver_customers_current():
+    return (
+        spark
+        .read
+        .table(SILVER_STORES)
+        .filter("__END_AT IS NULL")
+    )
 
 ### ---------------------
 ### Solution Is Below 
